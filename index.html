@@ -1,0 +1,1162 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Conversor HoloPrint → Pedestal de Construção</title>
+<style>:root{--bg:#f6f5f2;--card:#fff;--tx:#1d1d1b;--mut:#6b6a64;--bd:#dcdad3;--ac:#2f7d4f;--acx:#fff;--er:#b3261e;--wa:#8a5a00;--ok:#2f7d4f}
+:root:not([data-theme="light"]){}
+@media (prefers-color-scheme:dark){:root{--bg:#161614;--card:#222220;--tx:#eceae4;--mut:#a09e96;--bd:#3a3a36;--ac:#58b27a;--acx:#0d1a12;--er:#ff8a80;--wa:#e6b450;--ok:#58b27a}}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+body{padding:calc(14px + env(safe-area-inset-top,0px)) 14px calc(28px + env(safe-area-inset-bottom,0px));max-width:720px;margin:0 auto}
+h1{font-size:1.35rem;margin:6px 0 2px}
+h2{font-size:1.05rem;margin:0 0 8px}
+.sub{color:var(--mut);margin:0 0 14px;font-size:.92rem}
+section{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:14px;margin-bottom:12px}
+.btn,button.principal{display:inline-block;background:var(--ac);color:var(--acx);border:0;border-radius:10px;padding:12px 16px;font:inherit;font-weight:600;cursor:pointer;text-decoration:none;text-align:center}
+button:disabled{opacity:.5}
+input[type=file]{display:none}
+label.btn{margin-bottom:10px}
+.dica{color:var(--mut);font-size:.88rem;margin:6px 0}
+.pack{border:1px solid var(--bd);border-radius:12px;padding:10px;margin-top:10px}
+.ph{display:flex;justify-content:space-between;align-items:center;gap:8px;overflow-wrap:anywhere}
+.peq{background:none;border:1px solid var(--bd);color:var(--tx);border-radius:8px;padding:2px 9px;font:inherit;cursor:pointer}
+.meta{color:var(--mut);font-size:.88rem;margin:2px 0 8px}
+.campo{display:block;font-size:.88rem;color:var(--mut);margin:8px 0}
+.campo input{display:block;width:100%;margin-top:3px;padding:10px;border-radius:9px;border:1px solid var(--bd);background:var(--bg);color:var(--tx);font:inherit}
+.aviso{color:var(--wa);font-size:.88rem;margin:6px 0}
+details summary{cursor:pointer;margin-top:8px;font-size:.92rem}
+.mats{max-height:260px;overflow-y:auto;border:1px solid var(--bd);border-radius:9px}
+.mat{display:flex;align-items:center;gap:8px;padding:7px 9px;border-bottom:1px solid var(--bd);font-size:.9rem}
+.mat:last-child{border-bottom:0}
+.mat .mn{flex:1}.mat .mc{color:var(--mut);font-variant-numeric:tabular-nums}
+.opt{display:flex;gap:8px;align-items:flex-start;margin:6px 0 10px;font-size:.95rem}
+.linha{display:block;font-size:.88rem;color:var(--mut);margin:0 0 10px}
+.linha input{display:block;width:100%;margin-top:3px;padding:10px;border-radius:9px;border:1px solid var(--bd);background:var(--bg);color:var(--tx);font:inherit}
+#log{margin-top:10px;font-size:.88rem;max-height:220px;overflow-y:auto}
+#log .err{color:var(--er)}#log .ok{color:var(--ok)}
+#baixar{margin-top:10px;display:block}
+#resumo{margin-top:8px;font-size:.92rem}
+footer{color:var(--mut);font-size:.8rem;text-align:center;margin-top:16px}
+</style>
+</head>
+<body>
+<h1>Conversor HoloPrint → Pedestal de Construção</h1>
+<p class="sub">Escolha os packs do HoloPrint e eu gero o addon com um pedestal que constrói todos eles pelo menu. Tudo roda no seu aparelho, sem internet e sem enviar nada.</p>
+
+<section>
+  <h2>1. Packs do HoloPrint</h2>
+  <label class="btn" for="arqPacks">Escolher pack(s) .mcpack</label>
+  <input type="file" id="arqPacks" multiple>
+  <p class="dica">Pode escolher vários de uma vez, ou voltar aqui e adicionar mais.</p>
+  <div id="packs"></div>
+</section>
+
+<section>
+  <h2>2. Gerar</h2>
+  <label class="linha">Nome do addon <small>(aparece no arquivo e no menu do jogo junto com o HoloPrint)</small><input type="text" id="nomeSaida" value="Pedestal HoloPrint Teste" autocapitalize="none" spellcheck="false"></label>
+  <label class="opt"><input type="checkbox" id="bump" checked><span>Aumentar a versão do addon (recomendado: o Minecraft só troca o addon antigo se a versão for maior)</span></label>
+  <button class="principal" id="gerar" disabled>Gerar addon</button>
+  <div id="log"></div>
+  <div id="resumo"></div>
+  <a class="btn" id="baixar" hidden>Baixar</a>
+</section>
+<footer><div id="atualizacao">Última atualização: 23/10/2026</div>Pedestal: Construir agora, Ver itens, Ligar baú, e o holograma do HoloPrint (mostrar/ocultar, opacidade e camada). Receita: 6 tijolos de pedra + 1 graveto. Ou agache e clique num suporte de armadura com um graveto.</footer>
+<script>
+// ===== ZIP (leitura e escrita) sem bibliotecas externas =====
+const enc = new TextEncoder();
+const dec = new TextDecoder("utf-8");
+
+async function streamBytes(readable) {
+  const chunks = [];
+  const reader = readable.getReader();
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(value);
+    total += value.length;
+  }
+  const out = new Uint8Array(total);
+  let o = 0;
+  for (const c of chunks) { out.set(c, o); o += c.length; }
+  return out;
+}
+async function inflateRaw(bytes) {
+  const ds = new DecompressionStream("deflate-raw");
+  const w = ds.writable.getWriter();
+  w.write(bytes).catch(() => {});
+  w.close().catch(() => {});
+  return streamBytes(ds.readable);
+}
+async function deflateRaw(bytes) {
+  const cs = new CompressionStream("deflate-raw");
+  const w = cs.writable.getWriter();
+  w.write(bytes).catch(() => {});
+  w.close().catch(() => {});
+  return streamBytes(cs.readable);
+}
+
+// HoloPrint pode guardar a estrutura NBT dentro de um arquivo GZIP (.mcstructure.gzip).
+async function gunzip(bytes) {
+  if (typeof DecompressionStream === "undefined") {
+    throw new Error("Este navegador não oferece descompactação GZIP. Atualize o navegador e tente novamente.");
+  }
+  const ds = new DecompressionStream("gzip");
+  const w = ds.writable.getWriter();
+  w.write(bytes).catch(() => {});
+  w.close().catch(() => {});
+  return streamBytes(ds.readable);
+}
+
+const CRC_TABLE = (() => {
+  const t = new Uint32Array(256);
+  for (let n = 0; n < 256; n++) {
+    let c = n;
+    for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+    t[n] = c >>> 0;
+  }
+  return t;
+})();
+function crc32(bytes) {
+  let c = 0xffffffff;
+  for (let i = 0; i < bytes.length; i++) c = CRC_TABLE[(c ^ bytes[i]) & 0xff] ^ (c >>> 8);
+  return (c ^ 0xffffffff) >>> 0;
+}
+
+// Lê um zip e devolve { nomes: [...], ler(nome) -> Promise<Uint8Array> }
+function readZip(buf) {
+  const u8 = buf instanceof Uint8Array ? buf : new Uint8Array(buf);
+  const dv = new DataView(u8.buffer, u8.byteOffset, u8.byteLength);
+  let eocd = -1;
+  for (let i = u8.length - 22; i >= Math.max(0, u8.length - 22 - 65535); i--) {
+    if (dv.getUint32(i, true) === 0x06054b50) { eocd = i; break; }
+  }
+  if (eocd < 0) throw new Error("Arquivo não é um zip válido (ou está cortado/incompleto).");
+  const count = dv.getUint16(eocd + 10, true);
+  let p = dv.getUint32(eocd + 16, true);
+  const entries = new Map();
+  for (let i = 0; i < count; i++) {
+    if (dv.getUint32(p, true) !== 0x02014b50) throw new Error("Diretório do zip corrompido.");
+    const flags = dv.getUint16(p + 8, true);
+    const method = dv.getUint16(p + 10, true);
+    const csize = dv.getUint32(p + 20, true);
+    const usize = dv.getUint32(p + 24, true);
+    const nlen = dv.getUint16(p + 28, true);
+    const elen = dv.getUint16(p + 30, true);
+    const clen = dv.getUint16(p + 32, true);
+    const off = dv.getUint32(p + 42, true);
+    const name = dec.decode(u8.subarray(p + 46, p + 46 + nlen));
+    entries.set(name, { method, csize, usize, off, flags });
+    p += 46 + nlen + elen + clen;
+  }
+  return {
+    nomes: [...entries.keys()].filter((n) => !n.endsWith("/")),
+    tem: (n) => entries.has(n),
+    async ler(name) {
+      const e = entries.get(name);
+      if (!e) throw new Error("Arquivo não encontrado no zip: " + name);
+      const nlen = dv.getUint16(e.off + 26, true);
+      const elen = dv.getUint16(e.off + 28, true);
+      const start = e.off + 30 + nlen + elen;
+      const raw = u8.subarray(start, start + e.csize);
+      if (e.method === 0) return raw.slice();
+      if (e.method === 8) return inflateRaw(raw);
+      throw new Error("Método de compressão não suportado no zip: " + e.method);
+    },
+  };
+}
+
+// files: array de { name, data: Uint8Array }  -> Uint8Array do zip
+async function writeZip(files) {
+  const parts = [];
+  const central = [];
+  let offset = 0;
+  const DOS_TIME = 0, DOS_DATE = (46 << 9) | (1 << 5) | 1; // 2026-01-01
+  for (const f of files) {
+    const nameBytes = enc.encode(f.name);
+    const data = f.data;
+    const crc = crc32(data);
+    let method = 8;
+    let comp = data.length > 64 ? await deflateRaw(data) : data;
+    if (data.length <= 64 || comp.length >= data.length) { comp = data; method = 0; }
+    const lh = new Uint8Array(30 + nameBytes.length);
+    const lv = new DataView(lh.buffer);
+    lv.setUint32(0, 0x04034b50, true);
+    lv.setUint16(4, 20, true);
+    lv.setUint16(6, 0x0800, true);
+    lv.setUint16(8, method, true);
+    lv.setUint16(10, DOS_TIME, true);
+    lv.setUint16(12, DOS_DATE, true);
+    lv.setUint32(14, crc, true);
+    lv.setUint32(18, comp.length, true);
+    lv.setUint32(22, data.length, true);
+    lv.setUint16(26, nameBytes.length, true);
+    lv.setUint16(28, 0, true);
+    lh.set(nameBytes, 30);
+    parts.push(lh, comp);
+    const ch = new Uint8Array(46 + nameBytes.length);
+    const cv = new DataView(ch.buffer);
+    cv.setUint32(0, 0x02014b50, true);
+    cv.setUint16(4, 20, true);
+    cv.setUint16(6, 20, true);
+    cv.setUint16(8, 0x0800, true);
+    cv.setUint16(10, method, true);
+    cv.setUint16(12, DOS_TIME, true);
+    cv.setUint16(14, DOS_DATE, true);
+    cv.setUint32(16, crc, true);
+    cv.setUint32(20, comp.length, true);
+    cv.setUint32(24, data.length, true);
+    cv.setUint16(28, nameBytes.length, true);
+    cv.setUint32(42, offset, true);
+    ch.set(nameBytes, 46);
+    central.push(ch);
+    offset += lh.length + comp.length;
+  }
+  const cdSize = central.reduce((a, c) => a + c.length, 0);
+  const end = new Uint8Array(22);
+  const ev = new DataView(end.buffer);
+  ev.setUint32(0, 0x06054b50, true);
+  ev.setUint16(8, files.length, true);
+  ev.setUint16(10, files.length, true);
+  ev.setUint32(12, cdSize, true);
+  ev.setUint32(16, offset, true);
+  const all = [...parts, ...central, end];
+  const total = all.reduce((a, c) => a + c.length, 0);
+  const out = new Uint8Array(total);
+  let o = 0;
+  for (const c of all) { out.set(c, o); o += c.length; }
+  return out;
+}
+
+// ===== NBT (Bedrock, little-endian) leitura e escrita preservando tipos =====
+// compound = { t:10, e:[[nome, tipo, valor], ...] }; list = { et, items:[...] }; long = BigInt
+function nbtParse(u8) {
+  const dv = new DataView(u8.buffer, u8.byteOffset, u8.byteLength);
+  let p = 0;
+  const td = new TextDecoder();
+  const str = () => { const n = dv.getUint16(p, true); p += 2; const s = td.decode(u8.subarray(p, p + n)); p += n; return s; };
+  function payload(t) {
+    switch (t) {
+      case 1: return dv.getInt8(p++);
+      case 2: { const v = dv.getInt16(p, true); p += 2; return v; }
+      case 3: { const v = dv.getInt32(p, true); p += 4; return v; }
+      case 4: { const v = dv.getBigInt64(p, true); p += 8; return v; }
+      case 5: { const v = dv.getFloat32(p, true); p += 4; return v; }
+      case 6: { const v = dv.getFloat64(p, true); p += 8; return v; }
+      case 7: { const n = dv.getInt32(p, true); p += 4; const v = u8.slice(p, p + n); p += n; return v; }
+      case 8: return str();
+      case 9: {
+        const et = dv.getInt8(p++); const n = dv.getInt32(p, true); p += 4;
+        if (et === 3) { const a = new Int32Array(n); for (let i = 0; i < n; i++) { a[i] = dv.getInt32(p, true); p += 4; } return { et, items: a }; }
+        const items = new Array(n);
+        for (let i = 0; i < n; i++) items[i] = payload(et);
+        return { et, items };
+      }
+      case 10: {
+        const e = [];
+        for (;;) { const tt = dv.getInt8(p++); if (tt === 0) break; const k = str(); e.push([k, tt, payload(tt)]); }
+        return { t: 10, e };
+      }
+      case 11: { const n = dv.getInt32(p, true); p += 4; const a = new Int32Array(n); for (let i = 0; i < n; i++) { a[i] = dv.getInt32(p, true); p += 4; } return a; }
+      case 12: { const n = dv.getInt32(p, true); p += 4; const a = new Array(n); for (let i = 0; i < n; i++) { a[i] = dv.getBigInt64(p, true); p += 8; } return a; }
+      default: throw new Error("Tipo NBT desconhecido: " + t);
+    }
+  }
+  const rt = dv.getInt8(p++);
+  const rname = str();
+  return { name: rname, type: rt, value: payload(rt) };
+}
+function nbtWrite(root) {
+  const te = new TextEncoder();
+  let buf = new Uint8Array(1 << 20), dv = new DataView(buf.buffer), p = 0;
+  const need = (n) => { if (p + n > buf.length) { let m = buf.length * 2; while (m < p + n) m *= 2; const nb = new Uint8Array(m); nb.set(buf.subarray(0, p)); buf = nb; dv = new DataView(buf.buffer); } };
+  const str = (s) => { const b = te.encode(s); need(2 + b.length); dv.setUint16(p, b.length, true); p += 2; buf.set(b, p); p += b.length; };
+  function payload(t, v) {
+    switch (t) {
+      case 1: need(1); dv.setInt8(p++, v); break;
+      case 2: need(2); dv.setInt16(p, v, true); p += 2; break;
+      case 3: need(4); dv.setInt32(p, v, true); p += 4; break;
+      case 4: need(8); dv.setBigInt64(p, v, true); p += 8; break;
+      case 5: need(4); dv.setFloat32(p, v, true); p += 4; break;
+      case 6: need(8); dv.setFloat64(p, v, true); p += 8; break;
+      case 7: need(4 + v.length); dv.setInt32(p, v.length, true); p += 4; buf.set(v, p); p += v.length; break;
+      case 8: str(v); break;
+      case 9: {
+        need(5); dv.setInt8(p++, v.et); dv.setInt32(p, v.items.length, true); p += 4;
+        if (v.et === 3) { need(4 * v.items.length); for (let i = 0; i < v.items.length; i++) { dv.setInt32(p, v.items[i], true); p += 4; } }
+        else for (let i = 0; i < v.items.length; i++) payload(v.et, v.items[i]);
+        break;
+      }
+      case 10: {
+        for (const [k, tt, val] of v.e) { need(1); dv.setInt8(p++, tt); str(k); payload(tt, val); }
+        need(1); dv.setInt8(p++, 0); break;
+      }
+      case 11: need(4 + 4 * v.length); dv.setInt32(p, v.length, true); p += 4; for (let i = 0; i < v.length; i++) { dv.setInt32(p, v[i], true); p += 4; } break;
+      case 12: need(4 + 8 * v.length); dv.setInt32(p, v.length, true); p += 4; for (let i = 0; i < v.length; i++) { dv.setBigInt64(p, v[i], true); p += 8; } break;
+    }
+  }
+  need(1); dv.setInt8(p++, root.type);
+  str(root.name);
+  payload(root.type, root.value);
+  return buf.slice(0, p);
+}
+// utilitários de navegação
+function nget(comp, key) { const f = comp.e.find((x) => x[0] === key); return f ? f[2] : undefined; }
+function ngetEntry(comp, key) { return comp.e.find((x) => x[0] === key); }
+
+// ===== Nomes em português (rótulos dos materiais) =====
+const EXATO = {
+  "dirt_path": "Caminho de terra", "grass_path": "Caminho de terra", "chest": "Baú", "trapped_chest": "Baú com armadilha",
+  "barrel": "Barril", "hopper": "Funil", "piston": "Pistão", "sticky_piston": "Pistão pegajoso", "observer": "Observador",
+  "lever": "Alavanca", "ladder": "Escada de mão", "lantern": "Lanterna", "soul_lantern": "Lanterna da alma",
+  "torch": "Tocha", "soul_torch": "Tocha da alma", "redstone_torch": "Tocha de redstone", "glass": "Vidro",
+  "glass_pane": "Painel de vidro", "iron_bars": "Barras de ferro", "fence_gate": "Portão de cerca",
+  "crafting_table": "Mesa de trabalho", "furnace": "Fornalha", "blast_furnace": "Alto-forno", "smoker": "Defumador",
+  "dropper": "Liberador", "dispenser": "Dispensador", "tnt": "TNT", "bookshelf": "Estante de livros",
+  "grass_block": "Bloco de grama", "dirt": "Terra", "coarse_dirt": "Terra grossa", "farmland": "Terra arada",
+  "sand": "Areia", "gravel": "Cascalho", "stone": "Pedra", "cobblestone": "Pedregulho", "bedrock": "Rocha matriz",
+  "sea_lantern": "Lanterna do mar", "glowstone": "Pedra luminosa", "shroomlight": "Luz de fungo",
+  "ochre_froglight": "Luz de sapo ocre", "verdant_froglight": "Luz de sapo verdejante", "pearlescent_froglight": "Luz de sapo perolada",
+  "slime": "Bloco de slime", "honey_block": "Bloco de mel", "hay_block": "Fardo de feno", "bone_block": "Bloco de osso",
+  "iron_block": "Bloco de ferro", "gold_block": "Bloco de ouro", "diamond_block": "Bloco de diamante",
+  "emerald_block": "Bloco de esmeralda", "coal_block": "Bloco de carvão", "redstone_block": "Bloco de redstone",
+  "copper_block": "Bloco de cobre", "netherite_block": "Bloco de netherita", "lapis_block": "Bloco de lápis-lazúli",
+  "quartz_block": "Bloco de quartzo", "obsidian": "Obsidiana", "crying_obsidian": "Obsidiana chorosa",
+  "netherrack": "Netherrack", "soul_sand": "Areia da alma", "soul_soil": "Terra da alma", "magma": "Bloco de magma",
+  "ice": "Gelo", "packed_ice": "Gelo compactado", "blue_ice": "Gelo azul", "snow": "Neve", "snow_layer": "Neve (camada)",
+  "clay": "Argila", "sponge": "Esponja", "wet_sponge": "Esponja molhada", "moss_block": "Bloco de musgo", "moss_carpet": "Carpete de musgo",
+  "mud": "Lama", "packed_mud": "Lama compactada", "mud_bricks": "Tijolos de lama", "cactus": "Cacto",
+  "pumpkin": "Abóbora", "carved_pumpkin": "Abóbora talhada", "jack_o_lantern": "Lanterna de abóbora", "melon_block": "Melancia",
+  "redstone_lamp": "Lâmpada de redstone", "note_block": "Bloco musical", "jukebox": "Jukebox", "beacon": "Sinalizador",
+  "anvil": "Bigorna", "enchanting_table": "Mesa de encantamentos", "bell": "Sino", "campfire": "Fogueira", "soul_campfire": "Fogueira da alma",
+  "composter": "Composteira", "cauldron": "Caldeirão", "flower_pot": "Vaso de flor", "item_frame": "Moldura", "glow_frame": "Moldura luminosa",
+  "water_bucket": "Balde de água (fonte)", "lava_bucket": "Balde de lava (fonte)", "tripwire_hook": "Gancho de fio de armadilha",
+  "redstone": "Redstone", "repeater": "Repetidor", "comparator": "Comparador", "daylight_detector": "Sensor de luz do dia",
+  "target": "Alvo", "lightning_rod": "Para-raios", "slab": "Laje", "end_rod": "Bastão do End", "chain": "Corrente",
+  "sculk": "Sculk", "sculk_sensor": "Sensor de sculk", "sculk_shrieker": "Gritador de sculk", "sculk_catalyst": "Catalisador de sculk",
+  "calcite": "Calcita", "dripstone_block": "Bloco de pedra de gotejamento", "amethyst_block": "Bloco de ametista",
+  "budding_amethyst": "Ametista em brotação", "smooth_stone": "Pedra lisa", "stonecutter_block": "Cortador de pedra",
+  "loom": "Tear", "cartography_table": "Mesa de cartografia", "fletching_table": "Mesa de fletcher", "smithing_table": "Mesa de ferraria",
+  "grindstone": "Pedra de amolar", "lectern": "Atril", "bed": "Cama", "cake": "Bolo", "brewing_stand": "Aparelho de poções",
+  "water": "Água", "lava": "Lava", "white_wool": "Lã branca", "glowstone_block": "Pedra luminosa",
+};
+// material: [nome, gênero]
+const MAT = {
+  dark_oak: ["carvalho escuro", "m"], pale_oak: ["carvalho pálido", "m"], oak: ["carvalho", "m"], spruce: ["abeto", "m"],
+  birch: ["bétula", "f"], jungle: ["selva", "f"], acacia: ["acácia", "f"], mangrove: ["mangue", "m"], cherry: ["cerejeira", "f"],
+  bamboo: ["bambu", "m"], crimson: ["carmesim", "m"], warped: ["fungo distorcido", "m"], azalea: ["azaleia", "f"],
+  flowering_azalea: ["azaleia florida", "f"], stone: ["pedra", "f"], cobblestone: ["pedregulho", "m"], deepslate: ["ardósia", "f"],
+  tuff: ["tufo", "m"], blackstone: ["pedra negra", "f"], basalt: ["basalto", "m"], granite: ["granito", "m"], diorite: ["diorito", "m"],
+  andesite: ["andesito", "m"], sandstone: ["arenito", "m"], red_sandstone: ["arenito vermelho", "m"], quartz: ["quartzo", "m"],
+  prismarine: ["prismarinho", "m"], purpur: ["púrpura", "f"], copper: ["cobre", "m"], iron: ["ferro", "m"], gold: ["ouro", "m"],
+  diamond: ["diamante", "m"], emerald: ["esmeralda", "f"], netherite: ["netherita", "f"], lapis: ["lápis-lazúli", "m"],
+  amethyst: ["ametista", "f"], mud: ["lama", "f"], clay: ["argila", "f"], terracotta: ["terracota", "f"], wool: ["lã", "f"],
+  concrete: ["concreto", "m"], concrete_powder: ["concreto em pó", "m"], glass: ["vidro", "m"], sand: ["areia", "f"], dirt: ["terra", "f"],
+  gravel: ["cascalho", "m"], obsidian: ["obsidiana", "f"], netherrack: ["netherrack", "f"], end_stone: ["pedra do End", "f"],
+  nether_brick: ["tijolo do Nether", "m"], red_nether_brick: ["tijolo vermelho do Nether", "m"], mossy: ["musgo", "m"], moss: ["musgo", "m"],
+  coal: ["carvão", "m"], bone: ["osso", "m"], snow: ["neve", "f"], ice: ["gelo", "m"], resin: ["resina", "f"], tile: ["ladrilho", "m"],
+  sea: ["mar", "m"], soul: ["alma", "f"], honey: ["mel", "m"], slime: ["slime", "m"], hay: ["feno", "m"], purple: ["roxo", "m"],
+  white: ["branco", "m"], orange: ["laranja", "m"], magenta: ["magenta", "m"], yellow: ["amarelo", "m"], lime: ["verde-limão", "m"],
+  pink: ["rosa", "m"], gray: ["cinza", "m"], cyan: ["ciano", "m"], blue: ["azul", "m"], brown: ["marrom", "m"], green: ["verde", "m"],
+  red: ["vermelho", "m"], black: ["preto", "m"], light_blue: ["azul-claro", "m"], light_gray: ["cinza-claro", "m"],
+};
+const CORES = new Set(["white","orange","magenta","light_blue","yellow","lime","pink","gray","light_gray","cyan","purple","blue","brown","green","red","black"]);
+// adjetivo: [m, f, mp, fp, grupo]  (A = junto do material, B = junto do bloco)
+const ADJ = {
+  polished: ["polido", "polida", "polidos", "polidas", "A"], chiseled: ["cinzelado", "cinzelada", "cinzelados", "cinzeladas", "A"],
+  smooth: ["liso", "lisa", "lisos", "lisas", "A"], cut: ["cortado", "cortada", "cortados", "cortadas", "A"],
+  cracked: ["rachado", "rachada", "rachados", "rachadas", "B"], mossy: ["musgoso", "musgosa", "musgosos", "musgosas", "B"],
+  waxed: ["encerado", "encerada", "encerados", "enceradas", "B"], exposed: ["exposto", "exposta", "expostos", "expostas", "B"],
+  weathered: ["desgastado", "desgastada", "desgastados", "desgastadas", "B"], oxidized: ["oxidado", "oxidada", "oxidados", "oxidadas", "B"],
+  raw: ["bruto", "bruta", "brutos", "brutas", "A"], dark: ["escuro", "escura", "escuros", "escuras", "A"],
+  white: ["branco","branca","brancos","brancas","A"], orange: ["laranja","laranja","laranjas","laranjas","A"], magenta: ["magenta","magenta","magentas","magentas","A"],
+  light_blue: ["azul-claro","azul-clara","azul-claros","azul-claras","A"], yellow: ["amarelo","amarela","amarelos","amarelas","A"], lime: ["verde-limão","verde-limão","verde-limão","verde-limão","A"],
+  pink: ["rosa","rosa","rosa","rosa","A"], gray: ["cinza","cinza","cinza","cinza","A"], light_gray: ["cinza-claro","cinza-clara","cinza-claros","cinza-claras","A"],
+  cyan: ["ciano","ciano","ciano","ciano","A"], purple: ["roxo","roxa","roxos","roxas","A"], blue: ["azul","azul","azuis","azuis","A"], brown: ["marrom","marrom","marrons","marrons","A"],
+  green: ["verde","verde","verdes","verdes","A"], red: ["vermelho","vermelha","vermelhos","vermelhas","A"], black: ["preto","preta","pretos","pretas","A"],
+};
+const ADJ_INV = { stripped: "sem casca" };
+// cabeça: [rótulo, gênero, plural, tipo]  tipo: "o" = externo, "i" = interno (tijolos/ladrilho)
+const HEAD = {
+  slab: ["laje", "f", false, "o"], stairs: ["escada", "f", false, "o"], wall: ["muro", "m", false, "o"], fence: ["cerca", "f", false, "o"],
+  fence_gate: ["portão de cerca", "m", false, "o"], trapdoor: ["alçapão", "m", false, "o"], door: ["porta", "f", false, "o"],
+  button: ["botão", "m", false, "o"], pressure_plate: ["placa de pressão", "f", false, "o"], bars: ["barras", "f", true, "o"],
+  planks: ["tábuas", "f", true, "o"], log: ["tronco", "m", false, "o"], wood: ["madeira", "f", false, "o"], leaves: ["folhas", "f", true, "o"],
+  sign: ["placa", "f", false, "o"], carpet: ["carpete", "m", false, "o"], pane: ["painel", "m", false, "o"], sapling: ["muda", "f", false, "o"],
+  bricks: ["tijolos", "m", true, "i"], brick: ["tijolos", "m", true, "i"], tiles: ["ladrilho", "m", false, "i"], tile: ["ladrilho", "m", false, "i"],
+};
+function cap(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
+function agr(adj, g, pl) { return adj[(pl ? 2 : 0) + (g === "f" ? 1 : 0)]; }
+
+function etiquetaPT(nome) {
+  const n = String(nome).replace(/^minecraft:/, "");
+  if (EXATO[n]) return EXATO[n];
+  let toks = n.split("_");
+  let outer = null, inner = null;
+  const two = toks.slice(-2).join("_");
+  if (toks.length >= 2 && HEAD[two]) { outer = HEAD[two]; toks = toks.slice(0, -2); }
+  else if (HEAD[toks[toks.length - 1]] && toks.length >= 1) {
+    const h = HEAD[toks[toks.length - 1]];
+    if (h[3] === "o") { outer = h; toks = toks.slice(0, -1); }
+  }
+  const lastTok = toks[toks.length - 1];
+  if (HEAD[lastTok] && HEAD[lastTok][3] === "i") { inner = HEAD[lastTok]; toks = toks.slice(0, -1); }
+  else if (!outer && HEAD[lastTok]) { outer = HEAD[lastTok]; toks = toks.slice(0, -1); }
+  // adjetivos e material
+  const adjA = [], adjB = [], inv = [], mats = [];
+  for (let i = 0; i < toks.length; i++) {
+    const t2 = toks[i] + "_" + toks[i + 1];
+    if (i + 1 < toks.length && (MAT[t2] || ADJ[t2])) {
+      if (ADJ[t2]) { (ADJ[t2][4] === "A" ? adjA : adjB).push(ADJ[t2]); }
+      else mats.push(MAT[t2]);
+      i++; continue;
+    }
+    const t = toks[i];
+    if (ADJ_INV[t]) inv.push(ADJ_INV[t]);
+    else if (ADJ[t] && !(mats.length === 0 && i === toks.length - 1 && MAT[t] && CORES.has(t) === false && !outer && !inner && false)) {
+      // cor sozinha como único token vira material (ex.: "white" não ocorre sozinho)
+      (ADJ[t][4] === "A" ? adjA : adjB).push(ADJ[t]);
+    }
+    else if (MAT[t]) mats.push(MAT[t]);
+    else mats.push([t.replace(/^./, (c) => c.toLowerCase()), "m", true]);
+  }
+  const mat = mats.length ? mats[mats.length - 1] : null;
+  const matTxt = mats.map((m) => m[0]).join(" ");
+  const gMat = mat ? mat[1] : "m";
+  const headFinal = inner || outer;
+  let parts = [];
+  if (outer && inner) parts.push(outer[0], inner[0]);
+  else if (outer) parts.push(outer[0]);
+  else if (inner) parts.push(inner[0]);
+  let txt = parts.join(" de ");
+  if (matTxt) txt = txt ? txt + " de " + matTxt : matTxt;
+  if (!txt) txt = n.replace(/_/g, " ");
+  const aTxt = adjA.slice().reverse().map((a) => agr(a, gMat, false));
+  txt += (aTxt.length ? " " + aTxt.join(" ") : "");
+  const gB = headFinal ? headFinal[1] : gMat;
+  const plB = headFinal ? headFinal[2] : false;
+  const bTxt = adjB.slice().reverse().map((a) => agr(a, gB, plB));
+  txt += (bTxt.length ? " " + bTxt.join(" ") : "");
+  if (inv.length) txt += " " + inv.join(" ");
+  return cap(txt);
+}
+
+// ===== Conversão HoloPrint -> Mesa de Construção =====
+const IGNORAR = new Set(["minecraft:air", "minecraft:structure_void", "minecraft:piston_arm_collision", "minecraft:sticky_piston_arm_collision",
+  "minecraft:moving_block", "minecraft:unknown", "minecraft:info_update", "minecraft:info_update2", "minecraft:reserved6",
+  "minecraft:structure_block", "minecraft:jigsaw", "minecraft:command_block", "minecraft:chain_command_block",
+  "minecraft:repeating_command_block", "minecraft:barrier", "minecraft:light_block", "minecraft:light_block_0",
+  "minecraft:light_block_1", "minecraft:light_block_2", "minecraft:light_block_3", "minecraft:light_block_4",
+  "minecraft:light_block_5", "minecraft:light_block_6", "minecraft:light_block_7", "minecraft:light_block_8",
+  "minecraft:light_block_9", "minecraft:light_block_10", "minecraft:light_block_11", "minecraft:light_block_12",
+  "minecraft:light_block_13", "minecraft:light_block_14", "minecraft:light_block_15", "minecraft:border_block",
+  "minecraft:allow", "minecraft:deny"]);
+const LIQUIDOS = { "minecraft:water": "water", "minecraft:flowing_water": "water", "minecraft:lava": "lava", "minecraft:flowing_lava": "lava" };
+const ITEM_BALDE = { water: "minecraft:water_bucket", lava: "minecraft:lava_bucket" };
+const GRATIS_RE = /(froglight|bedrock$|^minecraft:barrier$|budding_amethyst|spawner|reinforced_deepslate|command_block|structure_block|jigsaw|light_block|^minecraft:light_block|end_portal|dragon_egg|monster_egg|infested|vault$|heavy_core|border_block|^minecraft:allow$|^minecraft:deny$)/;
+const APOIO_TOKENS = new Set(["ladder","lantern","lever","torch","button","sign","banner","rail","carpet","plate","repeater","comparator","tripwire","hook","vine","vines","lichen","vein","frame","sapling","propagule","door","candle","pad","fan","kelp","seagrass","cactus","cane","bush","rose","tulip","poppy","dandelion","orchid","allium","bluet","cornflower","lily","peony","lilac","sunflower","mushroom","fungus","roots","blossom","dripleaf","petals","litter","wire","stem","bell","bamboo","cluster","bud","reeds","wheat","carrots","potatoes","beetroot","cocoa","pickle","pickles","flower","fern","grass"]);
+const APOIO_EXATO = new Set(["minecraft:snow_layer","minecraft:redstone_wire","minecraft:tripwire","minecraft:flower_pot","minecraft:bed","minecraft:wheat","minecraft:lit_redstone_lamp_never","minecraft:comparator","minecraft:repeater"]);
+const NAO_APOIO = /(grass_block|grass_path|dirt_path|mushroom_block|_stem_block|bamboo_block|bamboo_planks|bamboo_mosaic|door$|trapdoor|bells?_block)/;
+function precisaApoio(nome) {
+  if (APOIO_EXATO.has(nome)) return true;
+  const n = nome.replace(/^minecraft:/, "");
+  if (/trapdoor$/.test(n) || /^(grass_block|dirt_path|grass_path)$/.test(n) || /(mushroom_block|bamboo_block|bamboo_planks|bamboo_mosaic|bamboo_stairs|bamboo_slab|bamboo_fence|bamboo_button|bamboo_pressure|bamboo_sign|bamboo_trapdoor)/.test(n)) {
+    return /(button|pressure_plate|sign|door)$/.test(n) && !/trapdoor$/.test(n);
+  }
+  const last = n.split("_").pop();
+  return APOIO_TOKENS.has(last);
+}
+function itemDe(nome) {
+  let n = nome;
+  if (n.endsWith("_double_slab")) return n.replace("_double_slab", "_slab");
+  const mapa = {
+    "minecraft:standing_sign": "minecraft:oak_sign", "minecraft:wall_sign": "minecraft:oak_sign",
+    "minecraft:unlit_redstone_torch": "minecraft:redstone_torch", "minecraft:redstone_wire": "minecraft:redstone",
+    "minecraft:unpowered_repeater": "minecraft:repeater", "minecraft:powered_repeater": "minecraft:repeater",
+    "minecraft:unpowered_comparator": "minecraft:comparator", "minecraft:powered_comparator": "minecraft:comparator",
+    "minecraft:lit_redstone_lamp": "minecraft:redstone_lamp", "minecraft:lit_furnace": "minecraft:furnace",
+    "minecraft:lit_blast_furnace": "minecraft:blast_furnace", "minecraft:lit_smoker": "minecraft:smoker",
+    "minecraft:wheat": "minecraft:wheat_seeds", "minecraft:carrots": "minecraft:carrot", "minecraft:potatoes": "minecraft:potato",
+    "minecraft:beetroot": "minecraft:beetroot_seeds", "minecraft:melon_stem": "minecraft:melon_seeds", "minecraft:pumpkin_stem": "minecraft:pumpkin_seeds",
+    "minecraft:reeds": "minecraft:sugar_cane", "minecraft:cocoa": "minecraft:cocoa_beans", "minecraft:sweet_berry_bush": "minecraft:sweet_berries",
+    "minecraft:tripwire": "minecraft:string", "minecraft:daylight_detector_inverted": "minecraft:daylight_detector",
+    "minecraft:frame": "minecraft:item_frame", "minecraft:glow_frame": "minecraft:glow_item_frame", "minecraft:lit_pumpkin": "minecraft:jack_o_lantern",
+    "minecraft:standing_banner": "minecraft:banner", "minecraft:wall_banner": "minecraft:banner",
+    "minecraft:grass_path": "minecraft:dirt_path", "minecraft:grass": "minecraft:grass_block",
+    "minecraft:wooden_door": "minecraft:oak_door", "minecraft:iron_door": "minecraft:iron_door",
+  };
+  if (mapa[n]) return mapa[n];
+  n = n.replace(/_(standing|wall)_sign$/, "_sign");
+  return n;
+}
+function bpiDe(nome) { return nome.endsWith("_double_slab") || /_door$/.test(nome) ? 2 : 1; }
+
+// ----- estrutura -----
+function estruturaRaiz(u8) {
+  const root = nbtParse(u8);
+  if (root.type !== 10) throw new Error("Estrutura inválida (raiz não é compound).");
+  return root;
+}
+function paletaDe(root) {
+  const st = nget(root.value, "structure");
+  const pal = nget(nget(nget(st, "palette"), "default"), "block_palette");
+  return pal.items.map((c) => ({ c, nome: nget(c, "name"), estados: nget(c, "states") }));
+}
+// Aplica os ajustes que o addon espera: folhas persistentes, baús vazios e remove blocos técnicos.
+const TECNICOS_RE = /^(minecraft:structure_block|minecraft:jigsaw|minecraft:command_block|minecraft:chain_command_block|minecraft:repeating_command_block|minecraft:barrier|minecraft:light_block|minecraft:border_block|minecraft:allow|minecraft:deny)/;
+function ajustarEstrutura(root) {
+  let folhas = 0, vazios = 0, tecnicos = 0;
+  const paleta = paletaDe(root);
+  for (const p of paleta) {
+    if (TECNICOS_RE.test(p.nome) || IGNORAR.has(p.nome) && p.nome !== "minecraft:air") {
+      // vira ar na estrutura (.mcstructure), pra não aparecer no mundo
+      const nameEntry = ngetEntry(p.c, "name");
+      if (nameEntry) { nameEntry[2] = "minecraft:air"; p.nome = "minecraft:air"; tecnicos++; }
+      continue;
+    }
+    if (/leaves/.test(p.nome)) {
+      const f = ngetEntry(p.estados, "persistent_bit");
+      if (f && f[2] === 0) { f[2] = 1; folhas++; }
+    }
+  }
+  const st = nget(root.value, "structure");
+  const bpd = nget(nget(nget(st, "palette"), "default"), "block_position_data");
+  if (bpd) for (const [, , bloco] of bpd.e) {
+    const bed = nget(bloco, "block_entity_data");
+    if (!bed) continue;
+    const it = ngetEntry(bed, "Items");
+    if (it) { if (it[2].items.length > 0) vazios++; it[2] = { et: 10, items: [] }; }
+  }
+  return { folhas, vazios, tecnicos };
+}
+function analisarEstrutura(root) {
+  const size = nget(root.value, "size").items;
+  const st = nget(root.value, "structure");
+  const bi = nget(st, "block_indices").items;
+  const l0 = bi[0].items || bi[0];
+  const l1 = bi[1] ? (bi[1].items || bi[1]) : null;
+  const pal = paletaDe(root);
+  const palette = pal.map((p) => {
+    const s = {};
+    for (const [k, t, v] of p.estados.e) s[k] = t === 1 ? !!v : (typeof v === "bigint" ? Number(v) : v);
+    return { n: p.nome, s };
+  });
+  const [sx, sy, sz] = size;
+  const info = pal.map((p, i) => {
+    const n = p.nome;
+    const liq = LIQUIDOS[n];
+    if (IGNORAR.has(n)) return { skip: true };
+    if (liq) {
+      const dep = nget(p.estados, "liquid_depth");
+      return { liq, fonte: !dep || dep === 0 };
+    }
+    return {};
+  });
+  const blocos = [];
+  let ignorados = 0, molhados = 0;
+  for (let y = 0; y < sy; y++) for (let x = 0; x < sx; x++) {
+    const base = (x * sy + y) * sz;
+    for (let z = 0; z < sz; z++) {
+      const pi = l0[base + z];
+      if (l1 && l1[base + z] >= 0 && LIQUIDOS[pal[l1[base + z]].nome]) molhados++;
+      if (pi < 0) continue;
+      if (info[pi].skip) { if (pal[pi].nome !== "minecraft:air") ignorados++; continue; }
+      blocos.push([x, y, z, pi]);
+    }
+  }
+  return { size: [sx, sy, sz], palette, nomes: pal.map((p) => p.nome), info, blocos, ignorados, molhados };
+}
+// materiais "grátis" possíveis (para a tela): um por nome de bloco (sem líquidos)
+function listarMateriais(an) {
+  const cont = new Map();
+  for (const b of an.blocos) {
+    const inf = an.info[b[3]];
+    if (inf.liq) continue;
+    const n = an.nomes[b[3]];
+    cont.set(n, (cont.get(n) || 0) + 1);
+  }
+  return [...cont.entries()].map(([nome, count]) => ({ nome, count, label: etiquetaPT(itemDe(nome)), gratis: GRATIS_RE.test(nome) }))
+    .sort((a, b) => b.count - a.count);
+}
+// gratisSet: Set de nomes de bloco marcados como grátis
+function montarDados(an, gratisSet) {
+  const grupos = new Map();
+  const pegar = (id, init) => { if (!grupos.has(id)) grupos.set(id, { ...init, blocks: [], minPi: 1e9 }); return grupos.get(id); };
+  for (const b of an.blocos) {
+    const pi = b[3]; const nome = an.nomes[pi]; const inf = an.info[pi];
+    let g;
+    if (inf.liq) {
+      const fonteGratis = gratisSet.has(nome) && false;
+      if (inf.fonte && !fonteGratis) { const it = ITEM_BALDE[inf.liq]; g = pegar(it, { id: it, item: it, label: etiquetaPT(it), bpi: 1, phase: 2, free: false }); }
+      else g = pegar("__free_" + inf.liq, { id: "__free_" + inf.liq, item: "__free_" + inf.liq, label: "", bpi: 1, phase: 2, free: true });
+    } else if (gratisSet.has(nome)) {
+      const ph = precisaApoio(nome) ? 1 : 0;
+      g = pegar("__free_" + ph, { id: "__free_" + ph, item: "__free_" + ph, label: "", bpi: 1, phase: ph, free: true });
+    } else {
+      const item = itemDe(nome);
+      const ph = precisaApoio(nome) ? 1 : 0;
+      g = pegar(item, { id: item, item, label: etiquetaPT(item), bpi: bpiDe(nome), phase: ph, free: false });
+    }
+    g.blocks.push(b); if (pi < g.minPi) g.minPi = pi;
+  }
+  const lista = [...grupos.values()];
+  for (const g of lista) g.count = g.free ? 0 : Math.ceil(g.blocks.length / g.bpi);
+  const cont = (g) => (g.free ? 0 : g.blocks.length);
+  lista.sort((a, b) => a.phase - b.phase || (a.free ? 1 : 0) - (b.free ? 1 : 0) || cont(b) - cont(a) || a.minPi - b.minPi);
+  return {
+    size: an.size, palette: an.palette,
+    groups: lista.map((g) => ({ id: g.id, item: g.item, label: g.label, count: g.count, bpi: g.bpi, phase: g.phase, free: g.free, blocks: g.blocks })),
+  };
+}
+function dadosJS(d) {
+  return "// Gerado automaticamente a partir do pack HoloPrint. Não edite à mão.\nexport default " + JSON.stringify(d) + ";\n";
+}
+
+// ----- arquivos por construção -----
+function entidadeBP(id) {
+  return JSON.stringify({
+    format_version: "1.21.0",
+    "minecraft:entity": {
+      description: {
+        identifier: `mesa:holo_${id}`, is_spawnable: false, is_summonable: true, is_experimental: false,
+        properties: {
+          "mesa:layer": { type: "int", range: [0, 512], default: 0, client_sync: true },
+          "mesa:opacity": { type: "int", range: [0, 6], default: 4, client_sync: true },
+          "mesa:tint": { type: "bool", default: false, client_sync: true },
+        },
+      },
+      components: {
+        "minecraft:collision_box": { width: 0.6, height: 1.8 },
+        "minecraft:physics": { has_gravity: false, has_collision: false },
+        "minecraft:pushable": { is_pushable: false, is_pushable_by_piston: false },
+        "minecraft:type_family": { family: ["mesa_holo"] },
+      },
+    },
+  }, null, 2);
+}
+function entidadeRP(id) {
+  const tex = {};
+  for (let i = 0; i < 7; i++) tex["op" + i] = `textures/mesa/${id}_${i}`;
+  tex.default = `textures/mesa/${id}_4`;
+  return JSON.stringify({
+    format_version: "1.10.0",
+    "minecraft:client_entity": {
+      description: {
+        identifier: `mesa:holo_${id}`, materials: { default: "entity_alphablend" }, textures: tex,
+        geometry: { default: `geometry.mesa.${id}` }, render_controllers: [`controller.render.mesa_holo_${id}`],
+        scripts: { should_update_bones_and_effects_offscreen: true },
+      },
+    },
+  }, null, 2);
+}
+function renderController(id, camadas) {
+  const pv = [];
+  for (let i = 0; i < camadas; i++) pv.push({ ["l_" + i]: `q.property('mesa:layer') == 0 || q.property('mesa:layer') == ${i + 1}` });
+  return JSON.stringify({
+    format_version: "1.8.0",
+    render_controllers: {
+      ["controller.render.mesa_holo_" + id]: {
+        arrays: { textures: { "Array.op": [0,1,2,3,4,5,6].map((i) => "Texture.op" + i) } },
+        geometry: "Geometry.default", materials: [{ "*": "Material.default" }],
+        textures: ["Array.op[math.clamp(q.property('mesa:opacity'), 0, 6)]"], part_visibility: pv,
+        ignore_lighting: true, is_hurt_color: { r: 0, g: 0, b: 0, a: 0 }, on_fire_color: { r: 0, g: 0, b: 0, a: 0 },
+        overlay_color: { r: 0.3412, g: 0.6196, b: 0.9804, a: "q.property('mesa:tint') ? 0.2 : 0" },
+      },
+    },
+  });
+}
+function buildsJS(lista) {
+  const imports = lista.map((b) => `import D_${b.id} from "./data/${b.id}.js";`).join("\n");
+  const entradas = lista.map((b) => `  ${b.id}: make(${JSON.stringify(b.id)}, ${JSON.stringify(b.nome)}, D_${b.id}),`).join("\n");
+  return `// Lista de construções da Mesa (gerada automaticamente a partir dos packs HoloPrint).
+${imports}
+
+// Quantos blocos a leste da mesa a construção começa (a mesa ocupa 2 de largura).
+const OFFSET_X = 3;
+
+function make(id, name, d) {
+  const total = d.groups.reduce((a, g) => a + g.blocks.length, 0);
+  return {
+    id, name, total,
+    size: { x: d.size[0], y: d.size[1], z: d.size[2] },
+    offsetX: OFFSET_X,
+    entityId: \`mesa:holo_\${id}\`,
+    structureId: \`mesa:\${id}\`,
+    palette: d.palette,
+    groups: d.groups,
+  };
+}
+
+export const BUILDS = {
+${entradas}
+};
+`;
+}
+function slug(s) {
+  let r = String(s).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+  if (!r) r = "construcao";
+  if (/^[0-9]/.test(r)) r = "b_" + r;
+  return r;
+}
+
+// ----- ler um pack do HoloPrint -----
+// Um pack pode ter várias estruturas (0.mcstructure, 1.mcstructure, ...). Devolve uma lista, uma por estrutura.
+async function lerPack(buf, nomeArquivo) {
+  const zip = readZip(buf);
+  const nomes = zip.nomes;
+  // Aceita tanto estruturas NBT sem compressão quanto as estruturas GZIP do HoloPrint.
+  const estr = nomes.filter((n) => {
+    const low = n.toLowerCase();
+    return low.endsWith(".mcstructure") || low.endsWith(".mcstructure.gzip");
+  }).sort((x, y) => x.localeCompare(y, undefined, { numeric: true }));
+  if (!estr.length) throw new Error("Não achei a estrutura (.mcstructure ou .mcstructure.gzip) dentro do pack. Esse arquivo foi gerado pelo HoloPrint?");
+  const geoNome = nomes.find((n) => /models\/entity\/[^/]*hologram[^/]*\.geo\.json$/i.test(n)) || nomes.find((n) => /models\/entity\/.*\.geo\.json$/i.test(n));
+  const texes = nomes.map((n) => { const m = n.match(/hologram_opacity_([0-9.]+)\.png$/i); return m ? { n, o: parseFloat(m[1]) } : null; }).filter(Boolean).sort((a, b) => a.o - b.o);
+  let nomePack = "";
+  try { const m = JSON.parse(dec.decode(await zip.ler("manifest.json"))); nomePack = (m.header && m.header.name) || ""; } catch {}
+  // O HoloPrint junta os nomes das estruturas com vírgula no nome do pack.
+  const partes = nomePack.split(/\s*,\s*/).filter(Boolean);
+  const lista = [];
+  for (let i = 0; i < estr.length; i++) {
+    let estruturaBytes = await zip.ler(estr[i]);
+    if (estr[i].toLowerCase().endsWith(".mcstructure.gzip") ||
+        (estruturaBytes.length >= 2 && estruturaBytes[0] === 0x1f && estruturaBytes[1] === 0x8b)) {
+      estruturaBytes = await gunzip(estruturaBytes);
+    }
+    const root = estruturaRaiz(estruturaBytes);
+    const ajuste = ajustarEstrutura(root);
+    const an = analisarEstrutura(root);
+    let nome = nomePack;
+    if (estr.length > 1) nome = partes.length === estr.length ? partes[i] : (nomePack || nomeArquivo.replace(/\.[^.]+$/, "")) + " " + (i + 1);
+    lista.push({ indice: i, zip, nomeArquivo: estr.length > 1 ? nomeArquivo + " (" + (i + 1) + "/" + estr.length + ")" : nomeArquivo, nomePack: nome, geoNome, texes: texes.slice(0, 7).map((t) => t.n), root, ajuste, an, materiais: listarMateriais(an) });
+    await tick();
+  }
+  return lista;
+}
+
+// ----- conserta texturas "faltando" (roxo e preto) na imagem do holograma -----
+async function zlibInflate(bytes) {
+  const ds = new DecompressionStream("deflate");
+  const w = ds.writable.getWriter(); w.write(bytes).catch(() => {}); w.close().catch(() => {});
+  return streamBytes(ds.readable);
+}
+async function zlibDeflate(bytes) {
+  const cs = new CompressionStream("deflate");
+  const w = cs.writable.getWriter(); w.write(bytes).catch(() => {}); w.close().catch(() => {});
+  return streamBytes(cs.readable);
+}
+function pngChunk(tipo, dados) {
+  const out = new Uint8Array(12 + dados.length), dv = new DataView(out.buffer);
+  dv.setUint32(0, dados.length); for (let i = 0; i < 4; i++) out[4 + i] = tipo.charCodeAt(i);
+  out.set(dados, 8);
+  dv.setUint32(8 + dados.length, crc32(out.subarray(4, 8 + dados.length)) >>> 0);
+  return out;
+}
+async function pngLer(u8) {
+  const dv = new DataView(u8.buffer, u8.byteOffset, u8.byteLength);
+  let o = 8, w = 0, h = 0, bd = 0, ct = 0, il = 0; const idat = [];
+  while (o + 8 <= u8.length) {
+    const len = dv.getUint32(o), tipo = String.fromCharCode(u8[o + 4], u8[o + 5], u8[o + 6], u8[o + 7]);
+    if (tipo === "IHDR") { w = dv.getUint32(o + 8); h = dv.getUint32(o + 12); bd = u8[o + 16]; ct = u8[o + 17]; il = u8[o + 20]; }
+    else if (tipo === "IDAT") idat.push(u8.subarray(o + 8, o + 8 + len));
+    else if (tipo === "IEND") break;
+    o += 12 + len;
+  }
+  if (bd !== 8 || il !== 0 || (ct !== 6 && ct !== 2)) return null;
+  const bpp = ct === 6 ? 4 : 3, total = idat.reduce((a, c) => a + c.length, 0), z = new Uint8Array(total);
+  let q = 0; for (const c of idat) { z.set(c, q); q += c.length; }
+  const raw = await zlibInflate(z), stride = w * bpp, rgba = new Uint8Array(w * h * 4);
+  let prev = new Uint8Array(stride);
+  for (let y = 0; y < h; y++) {
+    const f = raw[y * (stride + 1)], linha = raw.slice(y * (stride + 1) + 1, (y + 1) * (stride + 1));
+    for (let i = 0; i < stride; i++) {
+      const a = i >= bpp ? linha[i - bpp] : 0, b = prev[i], c = i >= bpp ? prev[i - bpp] : 0;
+      let v = linha[i];
+      if (f === 1) v += a; else if (f === 2) v += b; else if (f === 3) v += (a + b) >> 1;
+      else if (f === 4) { const pp = a + b - c, pa = Math.abs(pp - a), pb = Math.abs(pp - b), pc = Math.abs(pp - c); v += (pa <= pb && pa <= pc) ? a : (pb <= pc ? b : c); }
+      linha[i] = v & 255;
+    }
+    for (let x = 0; x < w; x++) {
+      const d = (y * w + x) * 4;
+      rgba[d] = linha[x * bpp]; rgba[d + 1] = linha[x * bpp + 1]; rgba[d + 2] = linha[x * bpp + 2]; rgba[d + 3] = bpp === 4 ? linha[x * bpp + 3] : 255;
+    }
+    prev = linha;
+  }
+  return { w, h, rgba };
+}
+async function pngEscrever(w, h, rgba) {
+  const raw = new Uint8Array((w * 4 + 1) * h);
+  for (let y = 0; y < h; y++) raw.set(rgba.subarray(y * w * 4, (y + 1) * w * 4), y * (w * 4 + 1) + 1);
+  const ih = new Uint8Array(13), dv = new DataView(ih.buffer);
+  dv.setUint32(0, w); dv.setUint32(4, h); ih[8] = 8; ih[9] = 6;
+  const partes = [new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]), pngChunk("IHDR", ih), pngChunk("IDAT", await zlibDeflate(raw)), pngChunk("IEND", new Uint8Array(0))];
+  const out = new Uint8Array(partes.reduce((a, c) => a + c.length, 0)); let o = 0;
+  for (const c of partes) { out.set(c, o); o += c.length; }
+  return out;
+}
+// Acha os quadrados roxo (255,0,255) + preto do "textura faltando" e troca por cinza neutro. Devolve { png, trocados }.
+async function consertarTexturaHolo(u8) {
+  let img; try { img = await pngLer(u8); } catch { return { png: u8, trocados: 0 }; }
+  if (!img) return { png: u8, trocados: 0 };
+  const { w, h, rgba } = img, N = w * h, marc = new Uint8Array(N);
+  const mag = (i) => rgba[i * 4 + 3] > 0 && rgba[i * 4] >= 250 && rgba[i * 4 + 1] <= 5 && rgba[i * 4 + 2] >= 250;
+  const pre = (i) => rgba[i * 4 + 3] > 0 && rgba[i * 4] <= 3 && rgba[i * 4 + 1] <= 3 && rgba[i * 4 + 2] <= 3;
+  const vis = new Uint8Array(N), comps = [];
+  for (let i0 = 0; i0 < N; i0++) {
+    if (vis[i0] || !mag(i0)) continue;
+    let x0 = w, y0 = h, x1 = 0, y1 = 0; const pil = [i0]; vis[i0] = 1;
+    while (pil.length) {
+      const i = pil.pop(), x = i % w, y = (i / w) | 0;
+      marc[i] = 1; if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y;
+      for (const j of [x > 0 ? i - 1 : -1, x < w - 1 ? i + 1 : -1, y > 0 ? i - w : -1, y < h - 1 ? i + w : -1]) if (j >= 0 && !vis[j] && mag(j)) { vis[j] = 1; pil.push(j); }
+    }
+    comps.push([x0, y0, x1, y1]);
+  }
+  const regiaoPreta = (a, b, c, d) => { if (a < 0 || b < 0 || c >= w || d >= h) return false; for (let y = b; y <= d; y++) for (let x = a; x <= c; x++) if (!pre(y * w + x)) return false; return true; };
+  const marcar = (a, b, c, d) => { for (let y = b; y <= d; y++) for (let x = a; x <= c; x++) marc[y * w + x] = 1; };
+  for (const [x0, y0, x1, y1] of comps) {
+    const cw = x1 - x0 + 1, ch = y1 - y0 + 1;
+    for (const [dx, dy] of [[-cw, 0], [cw, 0], [0, -ch], [0, ch]]) if (regiaoPreta(x0 + dx, y0 + dy, x1 + dx, y1 + dy)) marcar(x0 + dx, y0 + dy, x1 + dx, y1 + dy);
+  }
+  // Sobras pretas: retângulos pretos inteiros encostados numa área já marcada (quadrados cortados pela borda do bloco).
+  const visP = new Uint8Array(N);
+  for (let i0 = 0; i0 < N; i0++) {
+    if (visP[i0] || marc[i0] || !pre(i0)) continue;
+    let x0 = w, y0 = h, x1 = 0, y1 = 0, n = 0, toca = false; const pil = [i0], membros = []; visP[i0] = 1;
+    while (pil.length) {
+      const i = pil.pop(), x = i % w, y = (i / w) | 0; membros.push(i); n++;
+      if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y;
+      for (const j of [x > 0 ? i - 1 : -1, x < w - 1 ? i + 1 : -1, y > 0 ? i - w : -1, y < h - 1 ? i + w : -1]) {
+        if (j < 0) continue;
+        if (marc[j]) toca = true;
+        else if (!visP[j] && pre(j)) { visP[j] = 1; pil.push(j); }
+      }
+    }
+    if (toca && n === (x1 - x0 + 1) * (y1 - y0 + 1)) for (const i of membros) marc[i] = 1;
+  }
+  let trocados = 0;
+  for (let i = 0; i < N; i++) if (marc[i]) {
+    const x = i % w, y = (i / w) | 0, t = 128 + (((x * 7 + y * 13) % 5) - 2) * 4;
+    rgba[i * 4] = t; rgba[i * 4 + 1] = t; rgba[i * 4 + 2] = t; trocados++;
+  }
+  return trocados ? { png: await pngEscrever(w, h, rgba), trocados } : { png: u8, trocados: 0 };
+}
+
+// ----- holograma do HoloPrint (um por estrutura) -----
+async function arquivosHolograma(pack, id, pastaBP, pastaRP) {
+  if (!pack.geoNome || !pack.texes.length) throw new Error("O pack não tem o modelo do holograma ou as texturas.");
+  const geoJ = JSON.parse(dec.decode(await pack.zip.ler(pack.geoNome)));
+  const geos = geoJ["minecraft:geometry"];
+  const alvo = geos.find((g) => g.description.identifier.endsWith(".hologram_" + pack.indice))
+    || (pack.indice === 0 ? geos.find((g) => !/(overlay|alignment)/.test(g.description.identifier)) : null);
+  if (!alvo) throw new Error("Não achei o holograma da estrutura " + (pack.indice + 1) + " dentro do pack.");
+  const camadas = alvo.bones.filter((b) => /^l_\d+$/.test(b.name)).length;
+  const d = alvo.description;
+  const novo = { format_version: geoJ.format_version, "minecraft:geometry": [{
+    description: { texture_width: d.texture_width, texture_height: d.texture_height, identifier: `geometry.mesa.${id}`, visible_bounds_width: 256, visible_bounds_height: 300, visible_bounds_offset: [0, 100, 0] },
+    // O modelo do HoloPrint sai girado 180° em relação à estrutura construída: gira o osso raiz pra alinhar.
+    bones: alvo.bones.map((b) => b.name === "hologram_alignment_wrapper" ? { ...b, pivot: [0, 0, 0], rotation: [0, 180, 0] } : b) }] };
+  const out = [];
+  out.push({ name: `${pastaBP}/entities/mesa_holo_${id}.json`, data: enc.encode(entidadeBP(id)) });
+  out.push({ name: `${pastaRP}/models/entity/mesa_${id}.geo.json`, data: enc.encode(JSON.stringify(novo)) });
+  out.push({ name: `${pastaRP}/entity/mesa_holo_${id}.entity.json`, data: enc.encode(entidadeRP(id)) });
+  out.push({ name: `${pastaRP}/render_controllers/mesa_holo_${id}.rc.json`, data: enc.encode(renderController(id, camadas)) });
+  let trocados = 0;
+  for (let i = 0; i < 7; i++) {
+    const r = await consertarTexturaHolo(await pack.zip.ler(pack.texes[Math.min(i, pack.texes.length - 1)]));
+    trocados = Math.max(trocados, r.trocados);
+    out.push({ name: `${pastaRP}/textures/mesa/${id}_${i}.png`, data: r.png });
+  }
+  return { arquivos: out, camadas, trocados };
+}
+
+// ----- arquivos gerados por pack -----
+async function arquivosDoPack(pack, id, gratisSet, pastaBP, pastaRP) {
+  const out = [];
+  const dados = montarDados(pack.an, gratisSet);
+  out.push({ name: `${pastaBP}/structures/mesa/${id}.mcstructure`, data: nbtWrite(pack.root) });
+  out.push({ name: `${pastaBP}/scripts/data/${id}.js`, data: enc.encode(dadosJS(dados)) });
+  out.push({ name: `${pastaBP}/entities/mesa_holo_${id}.json`, data: enc.encode(entidadeBP(id)) });
+  const geoTxt = dec.decode(await pack.zip.ler(pack.geoNome));
+  const geoJ = JSON.parse(geoTxt);
+  const geos = geoJ["minecraft:geometry"];
+  const alvo = geos.find((g) => /hologram_0$/.test(g.description.identifier)) || geos.find((g) => !/(overlay|alignment)/.test(g.description.identifier));
+  if (!alvo) throw new Error("Não achei a geometria principal do holograma.");
+  const camadas = alvo.bones.filter((b) => /^l_\d+$/.test(b.name)).length;
+  const d = alvo.description;
+  const novo = { format_version: geoJ.format_version, "minecraft:geometry": [{
+    description: { texture_width: d.texture_width, texture_height: d.texture_height, identifier: `geometry.mesa.${id}`, visible_bounds_width: 256, visible_bounds_height: 300, visible_bounds_offset: [0, 100, 0] },
+    bones: alvo.bones }] };
+  out.push({ name: `${pastaRP}/models/entity/mesa_${id}.geo.json`, data: enc.encode(JSON.stringify(novo)) });
+  out.push({ name: `${pastaRP}/entity/mesa_holo_${id}.entity.json`, data: enc.encode(entidadeRP(id)) });
+  out.push({ name: `${pastaRP}/render_controllers/mesa_holo_${id}.rc.json`, data: enc.encode(renderController(id, camadas)) });
+  for (let i = 0; i < 7; i++) out.push({ name: `${pastaRP}/textures/mesa/${id}_${i}.png`, data: await pack.zip.ler(pack.texes[i]) });
+  return { arquivos: out, camadas, dados };
+}
+
+
+
+// ===== Interface =====
+const $ = (s) => document.querySelector(s);
+const PACKS = []; // { pack, nome, id, idEditado, gratis:Set, erro }
+let BASE = null;  // { zip, nome, pastaBP, pastaRP } ou null
+let ultimaUrl = null;
+
+function esc(s) { return String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
+function fmt(n) { return n.toLocaleString("pt-BR"); }
+function b64ToU8(b) { const s = atob(b); const u = new Uint8Array(s.length); for (let i = 0; i < s.length; i++) u[i] = s.charCodeAt(i); return u; }
+const tick = () => new Promise((r) => setTimeout(r, 0));
+function log(msg, cls) { const el = $("#log"); const d = document.createElement("div"); if (cls) d.className = cls; d.textContent = msg; el.appendChild(d); el.scrollTop = el.scrollHeight; }
+
+function idUnico(base, ignorar) {
+  let id = slug(base), n = 2;
+  const usados = new Set(PACKS.filter((p) => p !== ignorar).map((p) => p.id));
+  const raiz = id;
+  while (usados.has(id)) id = raiz + "_" + n++;
+  return id;
+}
+
+async function adicionarPacks(files) {
+  for (const f of files) {
+    try {
+      log("Lendo " + f.name + "…");
+      await tick();
+      const buf = await f.arrayBuffer();
+      const packs = await lerPack(buf, f.name);
+      if (packs.length > 1) log(f.name + ": " + packs.length + " estruturas encontradas", "ok");
+      for (const pack of packs) {
+        const it = { nomeArquivo: f.name, gratis: new Set(), idEditado: false, pack };
+        const sugestao = pack.nomePack || f.name.replace(/\.[^.]+$/, "");
+        it.nome = sugestao;
+        it.id = idUnico(sugestao, it);
+        it.gratis = new Set(pack.materiais.filter((m) => m.gratis).map((m) => m.nome));
+        PACKS.push(it);
+        log("OK: " + pack.nomeArquivo + " (" + pack.an.size.join("×") + ", " + fmt(pack.an.blocos.length) + " blocos)", "ok");
+      }
+    } catch (e) {
+      log("Erro em " + f.name + ": " + e.message, "err");
+    }
+  }
+  desenharPacks();
+}
+
+function desenharPacks() {
+  const box = $("#packs");
+  box.innerHTML = "";
+  if (!PACKS.length) { box.innerHTML = '<p class="dica">Nenhum pack escolhido ainda.</p>'; $("#gerar").disabled = true; return; }
+  $("#gerar").disabled = false;
+  PACKS.forEach((it, idx) => {
+    const p = it.pack, an = p.an;
+    const card = document.createElement("div");
+    card.className = "pack";
+    const avisos = [];
+    if (an.ignorados) avisos.push(fmt(an.ignorados) + " blocos técnicos foram ignorados.");
+    if (an.molhados) avisos.push(fmt(an.molhados) + " blocos com água dentro (waterlogged) não são reconstruídos.");
+    const mats = p.materiais.map((m, i) => `<label class="mat"><input type="checkbox" data-i="${idx}" data-m="${i}" ${it.gratis.has(m.nome) ? "checked" : ""}><span class="mn">${esc(m.label)}</span><span class="mc">${fmt(m.count)}</span></label>`).join("");
+    card.innerHTML = `
+      <div class="ph"><strong>${esc(p.nomeArquivo)}</strong><button class="peq" data-rm="${idx}" title="Remover">✕</button></div>
+      <div class="meta">${an.size.join(" × ")} blocos · ${fmt(an.blocos.length)} blocos no total · ${p.materiais.length} materiais</div>
+      <label class="campo">Nome no menu do pedestal<input type="text" data-nome="${idx}" value="${esc(it.nome)}"></label>
+      <label class="campo">ID interno <small>(letras minúsculas, números e _)</small><input type="text" data-id="${idx}" value="${esc(it.id)}" autocapitalize="none" autocomplete="off" spellcheck="false"></label>
+      ${avisos.map((a) => `<div class="aviso">${esc(a)}</div>`).join("")}
+      <details><summary>Materiais grátis (não cobram item)</summary>
+        <p class="dica">Marque o que o pedestal deve construir sem pedir material (blocos impossíveis de conseguir, por exemplo). Água corrente já é grátis automaticamente.</p>
+        <div class="mats">${mats}</div></details>`;
+    box.appendChild(card);
+  });
+}
+
+document.addEventListener("input", (e) => {
+  const t = e.target;
+  if (t.dataset.nome !== undefined) {
+    const it = PACKS[+t.dataset.nome]; it.nome = t.value;
+    if (!it.idEditado) { it.id = idUnico(t.value || "construcao", it); const campo = document.querySelector(`[data-id="${t.dataset.nome}"]`); if (campo) campo.value = it.id; }
+  } else if (t.dataset.id !== undefined) {
+    const it = PACKS[+t.dataset.id]; it.idEditado = true; it.id = t.value;
+  }
+});
+document.addEventListener("change", (e) => {
+  const t = e.target;
+  if (t.dataset.m !== undefined && t.type === "checkbox") {
+    const it = PACKS[+t.dataset.i]; const m = it.pack.materiais[+t.dataset.m];
+    if (t.checked) it.gratis.add(m.nome); else it.gratis.delete(m.nome);
+  }
+});
+document.addEventListener("click", (e) => {
+  const rm = e.target.closest("[data-rm]");
+  if (rm) { PACKS.splice(+rm.dataset.rm, 1); desenharPacks(); }
+});
+
+$("#arqPacks").addEventListener("change", async (e) => { const fs = [...e.target.files]; e.target.value = ""; if (fs.length) await adicionarPacks(fs); });
+function bumpVersao(v) {
+  if (Array.isArray(v)) return [v[0], v[1], (v[2] || 0) + 1];
+  if (typeof v === "string") { const p = v.split("."); p[2] = String((parseInt(p[2] || "0", 10) || 0) + 1); return p.join("."); }
+  return v;
+}
+const REL_POR_CONSTRUCAO = [
+  /^structures\/mesa\//, /^scripts\/data\//, /^scripts\/builds\.js$/, /^entities\/mesa_holo_/,
+  /^models\/entity\/mesa_/, /^entity\/mesa_holo_/, /^render_controllers\/mesa_holo_/, /^textures\/mesa\//,
+];
+
+const SCRIPT_ADDON = String.raw`import{world,system}from"@minecraft/server";
+import{ActionFormData,ModalFormData}from"@minecraft/server-ui";
+const D=__DATA__;
+const K=b=>"bau:"+b.dimension.id+":"+b.x+","+b.y+","+b.z;
+const V=[[1,0,0],[-1,0,0],[0,1,0],[0,-1,0],[0,0,1],[0,0,-1]];
+function bau(b){const k=world.getDynamicProperty(K(b));if(!k)return;const[x,y,z]=k.split(",").map(Number);const c=b.dimension.getBlock({x,y,z});return c&&c.getComponent("inventory")?c:undefined}
+function ligar(p,b){for(const v of V){const c=b.dimension.getBlock({x:b.x+v[0],y:b.y+v[1],z:b.z+v[2]});if(c&&c.getComponent("inventory")){world.setDynamicProperty(K(b),c.x+","+c.y+","+c.z);p.sendMessage("§aBaú ligado!");return}}p.sendMessage("§cColoque um baú encostado no pedestal.")}
+function tot(c){const t={};if(!c)return t;const k=c.getComponent("inventory").container;for(let i=0;i<k.size;i++){const s=k.getItem(i);if(s)t[s.typeId]=(t[s.typeId]||0)+s.amount}return t}
+function itens(p,b,B){const t=tot(bau(b));let m="";for(const i of B.itens){const h=t[i.id]||0;m+=(h>=i.n?"§a":"§c")+i.nome+": "+h+"/"+i.n+"\n"}new ActionFormData().title("Itens necessários").body(m||"Nenhum item necessário.").button("Fechar").show(p)}
+function construir(p,b,B){
+if(p.getGameMode()!=="creative"){
+const c=bau(b);if(!c){p.sendMessage("§cLigue um baú primeiro.");return}
+const t=tot(c);const f=B.itens.filter(i=>(t[i.id]||0)<i.n);
+if(f.length){p.sendMessage("§cFaltam itens:\n"+f.map(i=>"- "+i.nome+" ("+(t[i.id]||0)+"/"+i.n+")").join("\n"));return}
+const k=c.getComponent("inventory").container;
+for(const i of B.itens){let r=i.n;for(let j=0;j<k.size&&r>0;j++){const s=k.getItem(j);if(s&&s.typeId===i.id){const u=Math.min(r,s.amount);r-=u;if(s.amount>u){s.amount-=u;k.setItem(j,s)}else k.setItem(j,undefined)}}}}
+pvOff(b);hOff(b);system.run(()=>{b.dimension.runCommand("structure load "+B.st+" "+(b.x+2)+" "+b.y+" "+b.z);p.sendMessage("§aConstruído!\n"+aviso(p,B,b))})}
+const PV=new Map();
+const pk=b=>b.dimension.id+":"+b.x+","+b.y+","+b.z;
+function pvOn(b,B){PV.set(pk(b),{d:b.dimension,x:b.x,y:b.y,z:b.z,B:B})}
+function pvOff(b){PV.delete(pk(b))}
+function pt(d,x,y,z,n){try{d.spawnParticle(n,{x:x,y:y,z:z})}catch(e){}}
+function aresta(d,a,b,c,e,f,g){const L=Math.max(Math.abs(e-a),Math.abs(f-b),Math.abs(g-c));const k=Math.max(1,Math.min(28,Math.ceil(L/2)));for(let i=0;i<=k;i++){const t=i/k;pt(d,a+(e-a)*t,b+(f-b)*t,c+(g-c)*t,"minecraft:endrod")}}
+system.runInterval(()=>{for(const[k,v]of[...PV]){let bl;try{bl=v.d.getBlock({x:v.x,y:v.y,z:v.z})}catch(e){}if(!bl)continue;if(bl.typeId!=="mesa:pedestal"){PV.delete(k);continue}
+const s=v.B.size||[1,1,1],x0=v.x+2,x1=x0+s[0],y0=v.y,y1=y0+s[1],z0=v.z,z1=z0+s[2],d=v.d;
+for(const y of[y0,y1])for(const z of[z0,z1])aresta(d,x0,y,z,x1,y,z);
+for(const x of[x0,x1])for(const z of[z0,z1])aresta(d,x,y0,z,x,y1,z);
+for(const x of[x0,x1])for(const y of[y0,y1])aresta(d,x,y,z0,x,y,z1);
+for(const x of[x0,x1])for(const z of[z0,z1]){pt(d,x,y0+0.2,z,"minecraft:villager_happy");pt(d,x,y1,z,"minecraft:villager_happy")}}},10);
+function aviso(p,B,b){const s=B.size||[1,1,1];return"§bÁrea: X "+(b.x+2)+" a "+(b.x+1+s[0])+", Y "+b.y+" a "+(b.y+s[1]-1)+", Z "+b.z+" a "+(b.z+s[2]-1)+" (tamanho "+s[0]+"x"+s[1]+"x"+s[2]+")"}
+function hpos(b){return{x:b.x+2.5,y:b.y,z:b.z+0.5}}
+function hAch(b){try{return b.dimension.getEntities({families:["mesa_holo"],location:hpos(b),maxDistance:1.5})}catch(e){return[]}}
+function hOff(b){for(const e of hAch(b)){try{e.remove()}catch(x){try{e.kill()}catch(y){}}}}
+function hOn(b,B){hOff(b);if(!B.ent)return false;try{const e=b.dimension.spawnEntity(B.ent,hpos(b));try{e.setRotation({x:0,y:0})}catch(x){}return true}catch(x){return false}}
+system.runInterval(()=>{for(const id of["overworld","nether","the_end"]){let d,L=[];try{d=world.getDimension(id);L=d.getEntities({families:["mesa_holo"]})}catch(e){continue}for(const e of L){try{const bl=d.getBlock({x:Math.floor(e.location.x-2),y:Math.floor(e.location.y),z:Math.floor(e.location.z)});if(bl&&bl.typeId!=="mesa:pedestal")e.remove()}catch(x){}}}},100);
+const OP=[40,50,60,70,80,90,100];
+function opac(p,b){const e=hAch(b)[0];if(!e){p.sendMessage("§cMostre o holograma primeiro.");return}let c=4;try{c=e.getProperty("mesa:opacity")}catch(x){}const n=((typeof c==="number"?c:4)+1)%7;try{e.setProperty("mesa:opacity",n);p.sendMessage("§7Opacidade: "+OP[n]+"%")}catch(x){p.sendMessage("§cNão consegui mudar a opacidade.")}}
+function camada(p,b,B){const e=hAch(b)[0];if(!e){p.sendMessage("§cMostre o holograma primeiro.");return}const m=B.cam||1;let c=0;try{c=e.getProperty("mesa:layer")||0}catch(x){}new ModalFormData().title("Camada do holograma").slider("Camada (0 = todas)",0,m,1,Math.min(c,m)).show(p).then(r=>{if(r.canceled)return;try{e.setProperty("mesa:layer",r.formValues[0])}catch(x){}})}
+function acoes(p,b,B){if(B.ent&&!hAch(b).some(e=>e.typeId===B.ent))hOn(b,B);
+const tem=hAch(b).length>0,pv=PV.has(pk(b));
+const A=[["Construir agora",construir],["Ver itens",itens],["Ligar baú",ligar]];
+if(B.ent){A.push([tem?"Ocultar holograma":"Mostrar holograma",(p,b,B)=>{if(tem){hOff(b);p.sendMessage("§7Holograma oculto.")}else if(!hOn(b,B))p.sendMessage("§cNão consegui criar o holograma.")}]);A.push(["Opacidade do holograma",opac]);A.push(["Camada do holograma",camada])}
+A.push([pv?"Ocultar contorno":"Mostrar contorno (partículas)",(p,b,B)=>{if(pv)pvOff(b);else pvOn(b,B)}]);
+const f=new ActionFormData().title(B.nome).body(aviso(p,B,b));A.forEach(x=>f.button(x[0]));
+f.show(p).then(r=>{if(r.canceled)return;A[r.selection][1](p,b,B)})}
+function menu(p,b){if(D.builds.length===1)return acoes(p,b,D.builds[0]);const f=new ActionFormData().title(D.titulo);D.builds.forEach(x=>f.button(x.nome));f.show(p).then(r=>{if(!r.canceled)acoes(p,b,D.builds[r.selection])})}
+const ini=e=>e.blockComponentRegistry.registerCustomComponent("mesa:pedestal",{onPlayerInteract:ev=>menu(ev.player,ev.block)});
+(system.beforeEvents&&system.beforeEvents.startup?system.beforeEvents.startup:world.beforeEvents.worldInitialize).subscribe(ini);
+function trocar(p,e){const inv=p.getComponent("inventory").container,i=p.selectedSlotIndex,s=inv.getItem(i);
+if(!s||s.typeId!=="minecraft:stick"||!p.isSneaking||e.typeId!=="minecraft:armor_stand")return;
+const l=e.location,d=e.dimension;
+if(p.getGameMode()!=="creative"){if(s.amount>1){s.amount--;inv.setItem(i,s)}else inv.setItem(i,undefined)}
+d.getBlock({x:Math.floor(l.x),y:Math.floor(l.y),z:Math.floor(l.z)}).setType("mesa:pedestal");
+if(e.remove)e.remove();else e.kill()}
+const be=world.beforeEvents.playerInteractWithEntity;
+if(be)be.subscribe(ev=>{const t=ev.itemStack;if(ev.player.isSneaking&&ev.target.typeId==="minecraft:armor_stand"&&t&&t.typeId==="minecraft:stick"){ev.cancel=true;system.run(()=>trocar(ev.player,ev.target))}});
+`;
+function uuidDe(s) { let h = ""; for (let i = 0; i < 4; i++) h += (crc32(enc.encode(s + "#" + i)) >>> 0).toString(16).padStart(8, "0"); return h.slice(0,8)+"-"+h.slice(8,12)+"-4"+h.slice(13,16)+"-8"+h.slice(17,20)+"-"+h.slice(20,32); }
+// Cubos do pedestal de pedra: base larga, degrau, coluna com pedregulhos e tampo.
+function cuboPedra() {
+  const C = (ox, oy, oz, w, h, d) => ({
+    origin: [ox, oy, oz], size: [w, h, d],
+    uv: {
+      north: { uv: [ox + 8, 16 - oy - h], uv_size: [w, h] }, south: { uv: [ox + 8, 16 - oy - h], uv_size: [w, h] },
+      east: { uv: [oz + 8, 16 - oy - h], uv_size: [d, h] }, west: { uv: [oz + 8, 16 - oy - h], uv_size: [d, h] },
+      up: { uv: [ox + 8, oz + 8], uv_size: [w, d] }, down: { uv: [ox + 8, oz + 8], uv_size: [w, d] },
+    },
+  });
+  return [
+    C(-8, 0, -8, 16, 2, 16),      // base larga
+    C(-7, 2, -7, 14, 2, 14),      // degrau
+    C(-4, 4, -4, 8, 6, 8),        // coluna central
+    C(3, 4, -6, 3, 3, 3), C(-6, 4, 3, 3, 2, 4), C(-6, 4, -6, 2, 4, 2), C(4, 4, 3, 2, 3, 3), // pedregulhos
+    C(-8, 10, -8, 16, 3, 16),     // tampo
+    C(-7, 13, -7, 14, 1, 14),     // topo chanfrado
+  ];
+}
+// Textura de pedregulho 16x16 (células irregulares, ladrilha sem emenda).
+async function texturaPedestal() {
+  const N = 16, cv = document.createElement("canvas"); cv.width = cv.height = N; const cx = cv.getContext("2d");
+  let seed = 20261023; const rnd = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296);
+  const pts = []; for (let i = 0; i < 9; i++) pts.push({ x: rnd() * N, y: rnd() * N, tom: 0.82 + rnd() * 0.28 });
+  const dist = (x, y, p) => { let dx = Math.abs(x - p.x), dy = Math.abs(y - p.y); if (dx > N / 2) dx = N - dx; if (dy > N / 2) dy = N - dy; return Math.hypot(dx, dy); };
+  const celula = (x, y) => { let a = 1e9, b = 1e9, ia = 0; pts.forEach((p, i) => { const d = dist(x, y, p); if (d < a) { b = a; a = d; ia = i; } else if (d < b) b = d; }); return { ia, a, b }; };
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+    const { ia, a, b } = celula(x + 0.5, y + 0.5), borda = b - a;
+    let t = pts[ia].tom * (0.94 + rnd() * 0.12);
+    if (borda < 1.1) t *= 0.55;           // junta escura
+    else if (borda < 2.0) t *= 0.9;       // sombra perto da junta
+    else if (a < 1.6) t *= 1.08;          // centro da pedra mais claro
+    const r = Math.min(255, 128 * t), g = Math.min(255, 126 * t), bl = Math.min(255, 120 * t);
+    cx.fillStyle = "rgb(" + (r | 0) + "," + (g | 0) + "," + (bl | 0) + ")"; cx.fillRect(x, y, 1, 1);
+  }
+  for (let i = 0; i < 10; i++) { cx.fillStyle = "rgba(70,90,60,0.35)"; cx.fillRect((rnd() * N) | 0, (rnd() * N) | 0, 1, 1); } // musgo leve
+  const blob = await new Promise((r) => cv.toBlob(r, "image/png"));
+  return new Uint8Array(await blob.arrayBuffer());
+}
+async function gerar() {
+  const btn = $("#gerar");
+  btn.disabled = true; $("#log").innerHTML = ""; $("#baixar").hidden = true; $("#resumo").textContent = "";
+  try {
+    if (!PACKS.length) throw new Error("Escolha pelo menos um pack.");
+    const vistos = new Set();
+    for (const it of PACKS) {
+      it.id = slug(it.id); it.nome = (it.nome || "").trim() || it.id;
+      if (vistos.has(it.id)) throw new Error("Dois packs com o mesmo ID: " + it.id);
+      vistos.add(it.id);
+    }
+    const addonNome = String($("#nomeSaida").value || "Pedestal HoloPrint Teste").replace(/\.(mcaddon|zip)$/i, "").replace(/_+/g, " ").trim() || "Pedestal HoloPrint Teste";
+    const BP = "Pedestal BP", RP = "Pedestal RP", arq = [], builds = [];
+    for (const it of PACKS) {
+      log("Convertendo " + it.nome + "…"); await tick();
+      const d = montarDados(it.pack.an, it.gratis);
+      const itens = d.groups.filter((g) => !g.free).map((g) => ({ id: g.item, n: g.count, nome: g.label }));
+      arq.push({ name: BP + "/structures/mesa/" + it.id + ".mcstructure", data: nbtWrite(it.pack.root) });
+      const bd = { nome: it.nome, st: "mesa:" + it.id, itens, size: it.pack.an.size };
+      try {
+        const h = await arquivosHolograma(it.pack, it.id, BP, RP);
+        for (const a of h.arquivos) arq.push(a);
+        bd.ent = "mesa:holo_" + it.id; bd.cam = h.camadas;
+        log("  holograma incluído (" + h.camadas + " camadas)" + (h.trocados ? "; " + fmt(h.trocados) + " pixels de textura faltando trocados por cinza" : ""), "ok");
+      } catch (e) { log("  sem holograma: " + e.message, "err"); }
+      builds.push(bd);
+      log("  " + itens.length + " materiais", "ok");
+    }
+    const agora = new Date(), dias = Math.floor((agora - new Date(2026, 0, 1)) / 864e5), ver = $("#bump").checked ? [1, dias, agora.getHours() * 60 + agora.getMinutes()] : [1, 0, 0];
+    const J = (o) => enc.encode(JSON.stringify(o, null, 1));
+    const meta = { product_type: "addon", authors: ["yxvll9_"] };
+    const hd = (n, d, u) => ({ name: n, description: d, uuid: u, version: ver, min_engine_version: [1, 21, 50] });
+    const uRP = uuidDe(addonNome + "|rp");
+    arq.push({ name: BP + "/manifest.json", data: J({ format_version: 2, header: hd(addonNome, "Pedestal que constrói estruturas do HoloPrint", uuidDe(addonNome + "|bp")), modules: [{ type: "data", uuid: uuidDe(addonNome + "|bpd"), version: ver }, { type: "script", language: "javascript", uuid: uuidDe(addonNome + "|bps"), version: ver, entry: "scripts/main.js" }], dependencies: [{ uuid: uRP, version: ver }, { module_name: "@minecraft/server", version: "1.16.0" }, { module_name: "@minecraft/server-ui", version: "1.3.0" }], metadata: meta }) });
+    arq.push({ name: RP + "/manifest.json", data: J({ format_version: 2, header: hd(addonNome + " (recursos)", "Visual do pedestal", uRP), modules: [{ type: "resources", uuid: uuidDe(addonNome + "|rpm"), version: ver }], metadata: meta }) });
+    arq.push({ name: BP + "/scripts/main.js", data: enc.encode(SCRIPT_ADDON.replace("__DATA__", JSON.stringify({ titulo: addonNome, builds }))) });
+    arq.push({ name: BP + "/blocks/pedestal.block.json", data: J({ format_version: "1.21.50", "minecraft:block": { description: { identifier: "mesa:pedestal", menu_category: { category: "construction" } }, components: { "minecraft:geometry": "geometry.mesa_pedestal", "minecraft:material_instances": { "*": { texture: "mesa_pedestal", render_method: "opaque" } }, "minecraft:custom_components": ["mesa:pedestal"] } } }) });
+    arq.push({ name: BP + "/recipes/pedestal.recipe.json", data: J({ format_version: "1.20.10", "minecraft:recipe_shaped": { description: { identifier: "mesa:pedestal" }, tags: ["crafting_table"], pattern: ["TTT", " S ", "TTT"], key: { T: { item: "minecraft:stone_bricks" }, S: { item: "minecraft:stick" } }, unlock: [{ context: "AlwaysUnlocked" }], result: { item: "mesa:pedestal", count: 1 } } }) });
+    arq.push({ name: RP + "/models/blocks/pedestal.geo.json", data: J({ format_version: "1.12.0", "minecraft:geometry": [{ description: { identifier: "geometry.mesa_pedestal", texture_width: 16, texture_height: 16, visible_bounds_width: 2, visible_bounds_height: 2.5, visible_bounds_offset: [0, 0.75, 0] }, bones: [{ name: "b", pivot: [0, 0, 0], cubes: cuboPedra() }] }] }) });
+    arq.push({ name: RP + "/textures/terrain_texture.json", data: J({ resource_pack_name: "mesa", texture_name: "atlas.terrain", texture_data: { mesa_pedestal: { textures: "textures/blocks/mesa_pedestal" } } }) });
+    arq.push({ name: RP + "/textures/blocks/mesa_pedestal.png", data: await texturaPedestal() });
+    arq.push({ name: RP + "/texts/languages.json", data: enc.encode('["pt_BR","en_US"]') });
+    const ln = enc.encode("tile.mesa:pedestal.name=Pedestal de Construção\n");
+    arq.push({ name: RP + "/texts/pt_BR.lang", data: ln }); arq.push({ name: RP + "/texts/en_US.lang", data: ln });
+    log("Compactando…"); await tick();
+    const zip = await writeZip(arq);
+    let nome = addonNome.replace(/[\\\/:*?"<>|]+/g, "_") + ".mcaddon";
+    if (ultimaUrl) URL.revokeObjectURL(ultimaUrl);
+    ultimaUrl = URL.createObjectURL(new Blob([zip], { type: "application/octet-stream" }));
+    const a = $("#baixar"); a.href = ultimaUrl; a.download = nome; a.hidden = false; a.textContent = "Baixar " + nome;
+    $("#resumo").textContent = "Pronto: " + builds.length + " construção(ões), " + (zip.length / 1048576).toFixed(1) + " MB. Abra o arquivo baixado no Minecraft para instalar.";
+    log("Pronto!", "ok");
+  } catch (e) {
+    log("Erro: " + e.message, "err"); console.error(e);
+  } finally { btn.disabled = !PACKS.length; }
+}
+$("#gerar").addEventListener("click", gerar);
+desenharPacks();
+
+
+</script>
+</body>
+</html>
